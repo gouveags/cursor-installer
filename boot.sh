@@ -1,7 +1,10 @@
-#!/usr/bin/env bash
-# Exit immediately if a command exits with a non-zero status
-set -e
+#!/bin/bash
 
+# Source common functions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/scripts/common.sh"
+
+# Display ASCII art
 cat << 'EOF'
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -35,28 +38,21 @@ cat << 'EOF'
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 EOF
 
-printf "%s\n" "$ascii_art"
+log "No need to be frustrated anymore, cursor-installer is here to help!"
+echo
 
-echo -e "=> No need to be frustrated anymore, cursor-installer is here to help! \n"
+log "Beginning installation process. Press Ctrl+C to cancel at any time."
+echo
 
-echo -e "Beginning installation process. Press Ctrl+C to cancel at any time.\n"
+# Check OS compatibility
+check_os_compatibility
 
-if command -v apt >/dev/null; then
-	sudo apt-get update >/dev/null
-	sudo apt-get install -y git >/dev/null
-else
-  echo -e "/n❌ Unsupported distro (need apt). Exiting."; exit 1
-fi
+# Install system dependencies
+install_system_dependencies
 
-echo "Cloning cursor-installer..."
-rm -rf ~/.local/share/cursor-installer
-mkdir -p ~/.local/share/cursor-installer
-git clone https://github.com/gouveags/cursor-installer.git ~/.local/share/cursor-installer >/dev/null
-if [[ $BRANCH_REF != "main" ]]; then
-	cd ~/.local/share/cursor-installer
-	git fetch origin "${BRANCH_REF:-stable}" && git checkout "${BRANCH_REF:-stable}"
-	cd -
-fi
+# Install cursor-installer
+install_cursor_installer
 
-echo -e "\n🚀 Starting cursor-installer installation...\n"
-source ~/.local/share/cursor-installer/install.sh
+# Install Cursor
+log "Starting Cursor installation..."
+"$INSTALLER_BIN_DIR/cursor-installer"

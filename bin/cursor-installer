@@ -1,0 +1,206 @@
+#!/bin/bash
+
+# Source common functions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../scripts/common.sh"
+
+API="https://www.cursor.com/api/download?platform=linux-x64&releaseTrack=stable"
+APPDIR="$HOME/Applications/cursor"
+LINK="$APPDIR/cursor.AppImage"
+
+# Function to get installed version
+get_installed_version_display() {
+    if check_installation; then
+        get_installed_version
+    else
+        echo "none"
+    fi
+}
+
+# Function to display menu
+show_menu() {
+    clear
+    echo -e "\n${GREEN}Cursor Installer${NC}"
+    echo "=================="
+    echo " > Installed: $(get_installed_version_display)"
+    echo " > Latest   : $(get_latest_version)"
+    echo
+    echo "1) Install/Update Cursor"
+    echo "2) Uninstall Cursor"
+    echo "3) Remove Updater"
+    echo "4) Check for Updates"
+    echo "5) Quit"
+    echo
+}
+
+# Function to handle installation/update
+handle_install() {
+    local version
+    local download_url
+    local api_response
+
+    log "Fetching latest version information..."
+    api_response=$(curl -L "$API" || error "Failed to fetch version information")
+    version=$(echo "$api_response" | jq -r '.version' || error "Failed to parse version")
+    download_url=$(echo "$api_response" | jq -r '.downloadUrl' || error "Failed to parse download URL")
+
+    if check_installation; then
+        local current_version
+        current_version=$(get_installed_version)
+        if [ "$version" = "$current_version" ]; then
+            log "Cursor is already up to date (version $version)"
+            return
+        fi
+        warn "Updating Cursor from $current_version to $version"
+    else
+        log "Installing Cursor version $version"
+    fi
+
+    # Create temporary directory
+    mkdir -p "$TEMP_DIR"
+    cd "$TEMP_DIR"
+
+    # Download and install
+    log "Downloading Cursor..."
+    curl -L "$download_url" -o cursor.appimage || error "Failed to download Cursor"
+    chmod +x cursor.appimage
+    ./cursor.appimage --appimage-extract || error "Failed to extract AppImage"
+
+    # Backup current installation if exists
+    if [ -d "$INSTALL_DIR" ]; then
+        sudo mv "$INSTALL_DIR" "${INSTALL_DIR}.bak" || error "Failed to backup current installation"
+    fi
+
+    # Install new version
+    sudo mv squashfs-root "$INSTALL_DIR" || error "Failed to install new version"
+
+    # Save version
+    echo "$version" | sudo tee "$INSTALL_DIR/version.txt" > /dev/null
+
+    # Configure chrome-sandbox
+    local sandbox_path
+    sandbox_path=$(find "$INSTALL_DIR" -name "chrome-sandbox" 2>/dev/null)
+    if [ -z "$sandbox_path" ]; then
+        error "chrome-sandbox not found"
+    fi
+    sudo chown root:root "$sandbox_path"
+    sudo chmod 4755 "$sandbox_path"
+
+    # Create desktop entry and symlink
+    create_desktop_entry "$version"
+    sudo ln -sf "$INSTALL_DIR/AppRun" "$SYMLINK"
+
+    # Setup update service if not already set up
+    if [ ! -f "$HOME/.config/systemd/user/cursor-update.service" ]; then
+        log "Setting up automatic updates..."
+        setup_update_service
+    fi
+
+    # Cleanup
+    cleanup
+    if [ -d "${INSTALL_DIR}.bak" ]; then
+        sudo rm -rf "${INSTALL_DIR}.bak"
+    fi
+
+    log "Installation/Update completed successfully!"
+}
+
+# Function to handle uninstallation
+handle_uninstall() {
+    if ! check_installation; then
+        warn "Cursor is not installed"
+        return
+    fi
+
+    read -rp "Are you sure you want to uninstall Cursor? (y/N) " ans
+    if [[ "${ans,,}" != "y" ]]; then
+        log "Uninstallation cancelled"
+        return
+    fi
+
+    log "Starting Cursor uninstallation..."
+
+    # Remove desktop file
+    if [ -f "$DESKTOP_FILE" ]; then
+        log "Removing desktop entry..."
+        rm -f "$DESKTOP_FILE"
+        update-desktop-database ~/.local/share/applications/
+    fi
+
+    # Remove symlink
+    if [ -L "$SYMLINK" ]; then
+        log "Removing symlink..."
+        sudo rm -f "$SYMLINK"
+    fi
+
+    # Remove installation directory
+    if [ -d "$INSTALL_DIR" ]; then
+        log "Removing Cursor installation..."
+        sudo rm -rf "$INSTALL_DIR"
+    fi
+
+    # Remove temporary directory
+    if [ -d "$HOME/.local/share/cursor-installer" ]; then
+        log "Removing temporary files..."
+        rm -rf "$HOME/.local/share/cursor-installer"
+    fi
+
+    log "Uninstallation completed successfully!"
+}
+
+# Function to handle updater removal
+handle_updater_remove() {
+    if [ ! -f "$HOME/.config/systemd/user/cursor-update.service" ]; then
+        warn "Updater is not installed"
+        return
+    fi
+
+    read -rp "Are you sure you want to remove the Cursor updater? (y/N) " ans
+    if [[ "${ans,,}" != "y" ]]; then
+        log "Updater removal cancelled"
+        return
+    fi
+
+    log "Removing update service..."
+    systemctl --user disable --now cursor-update.timer cursor-update.service
+    rm -f "$HOME/.config/systemd/user/cursor-update."{service,timer}
+    systemctl --user daemon-reload
+    log "Updater removed successfully!"
+}
+
+# Function to handle update check
+handle_update_check() {
+    if ! check_installation; then
+        warn "Cursor is not installed"
+        return
+    fi
+
+    log "Checking for updates..."
+    "$SCRIPT_DIR/../scripts/cursor-update"
+}
+
+# Main menu loop
+main() {
+    while true; do
+        show_menu
+        read -rp "Choose an option (1-5): " choice
+        echo
+
+        case $choice in
+            1) handle_install ;;
+            2) handle_uninstall ;;
+            3) handle_updater_remove ;;
+            4) handle_update_check ;;
+            5) log "Goodbye!"; exit 0 ;;
+            *) warn "Invalid option. Please try again." ;;
+        esac
+
+        echo
+        read -rp "Press Enter to continue..."
+    done
+}
+
+# Run main menu
+main
+
+

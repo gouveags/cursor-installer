@@ -1,0 +1,68 @@
+#!/bin/bash
+
+# Source common functions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/common.sh"
+
+# Function to compare versions
+version_gt() {
+    test "$(printf '%s\n' "$@" | sort -V | head -n 1)" != "$1"
+}
+
+# Main update process
+main() {
+    # Check if Cursor is installed
+    if ! check_installation; then
+        exit 0
+    fi
+
+    # Get versions
+    local current_version
+    local latest_version
+    current_version=$(get_installed_version)
+    latest_version=$(get_latest_version)
+
+    # Compare versions
+    if version_gt "$latest_version" "$current_version"; then
+        log "New version available: $latest_version (current: $current_version)"
+        log "Starting update process..."
+
+        # Create temporary directory
+        mkdir -p "$TEMP_DIR"
+        cd "$TEMP_DIR"
+
+        # Get download URL
+        local api_response
+        local download_url
+        api_response=$(curl -L "$API_URL" || error "Failed to fetch version information")
+        download_url=$(echo "$api_response" | jq -r '.downloadUrl' || error "Failed to parse download URL")
+
+        # Download and install
+        curl -L "$download_url" -o cursor.appimage || error "Failed to download Cursor"
+        chmod +x cursor.appimage
+        ./cursor.appimage --appimage-extract || error "Failed to extract AppImage"
+
+        # Backup current installation
+        sudo mv "$INSTALL_DIR" "${INSTALL_DIR}.bak" || error "Failed to backup current installation"
+
+        # Install new version
+        sudo mv squashfs-root "$INSTALL_DIR" || error "Failed to install new version"
+
+        # Save version
+        echo "$latest_version" | sudo tee "$INSTALL_DIR/version.txt" > /dev/null
+
+        # Update desktop entry
+        create_desktop_entry "$latest_version"
+
+        # Cleanup
+        cleanup
+        sudo rm -rf "${INSTALL_DIR}.bak"
+
+        log "Update completed successfully!"
+    else
+        log "Cursor is up to date (version $current_version)"
+    fi
+}
+
+# Run main update process
+main
