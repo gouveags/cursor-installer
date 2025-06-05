@@ -32,6 +32,53 @@ error() {
     exit 1
 }
 
+# Function to check OS compatibility
+check_os_compatibility() {
+    if ! command -v apt >/dev/null; then
+        error "Unsupported distribution (requires apt). Exiting."
+    fi
+}
+
+# Function to install system dependencies
+install_system_dependencies() {
+    log "Installing system dependencies..."
+    sudo apt update -y
+    sudo apt install -y curl git unzip jq fuse3
+}
+
+clone_installer_repository() {
+    log "Cloning cursor-installer repository..."
+    rm -rf $INSTALLER_DIR
+    mkdir -p $INSTALLER_DIR
+    git clone https://github.com/gouveags/cursor-installer.git $INSTALLER_DIR >/dev/null
+    if [[ $BRANCH_REF != "main" ]]; then
+        cd $INSTALLER_DIR
+        git fetch origin "${BRANCH_REF:-stable}" && git checkout "${BRANCH_REF:-stable}"
+        cd -
+    fi
+}
+
+# Function to install cursor-installer
+install_cursor_installer() {
+    if check_installer_installation; then
+        log "cursor-installer is already installed"
+        return 0
+    fi
+
+    log "Installing cursor-installer..."
+
+    # Create necessary directories
+    mkdir -p "$INSTALLER_BIN_DIR"
+
+    # Make sure the installer file is executable
+    chmod +x "$INSTALLER_DIR/bin/cursor-installer"
+
+    # Create symlink
+    sudo ln -sf "$INSTALLER_DIR/bin/cursor-installer" "$INSTALLER_BIN_DIR/cursor-installer"
+
+    log "cursor-installer installed successfully!"
+}
+
 # Function to check if running as root
 check_root() {
     if [ "$EUID" -eq 0 ]; then
@@ -152,28 +199,7 @@ cleanup() {
     fi
 }
 
-# Function to install cursor-installer
-install_cursor_installer() {
-    if check_installer_installation; then
-        log "cursor-installer is already installed"
-        return 0
-    fi
 
-    log "Installing cursor-installer..."
-
-    # Create necessary directories
-    mkdir -p "$INSTALLER_DIR"
-    mkdir -p "$INSTALLER_BIN_DIR"
-
-    # Copy installer files
-    cp -r "$SCRIPT_DIR/../"* "$INSTALLER_DIR/"
-    chmod +x "$INSTALLER_DIR/bin/cursor-installer"
-
-    # Create symlink
-    sudo ln -sf "$INSTALLER_DIR/bin/cursor-installer" "$INSTALLER_BIN_DIR/cursor-installer"
-
-    log "cursor-installer installed successfully!"
-}
 
 # Function to uninstall cursor-installer
 uninstall_cursor_installer() {
@@ -193,16 +219,5 @@ uninstall_cursor_installer() {
     log "cursor-installer uninstalled successfully!"
 }
 
-# Function to check OS compatibility
-check_os_compatibility() {
-    if ! command -v apt >/dev/null; then
-        error "Unsupported distribution (requires apt). Exiting."
-    fi
-}
 
-# Function to install system dependencies
-install_system_dependencies() {
-    log "Installing system dependencies..."
-    sudo apt update -y
-    sudo apt install -y curl git unzip jq fuse3
-}
+
