@@ -170,7 +170,7 @@ install_cursor_installer() {
     chmod +x "$INSTALLER_DIR/bin/cursor-installer"
 
     # Create symlink
-    ln -sf "$INSTALLER_DIR/bin/cursor-installer" "$INSTALLER_BIN_DIR/cursor-installer"
+    sudo ln -sf "$INSTALLER_DIR/bin/cursor-installer" "$INSTALLER_BIN_DIR/cursor-installer"
 
     log "cursor-installer installed successfully!"
 }
@@ -204,5 +204,5 @@ check_os_compatibility() {
 install_system_dependencies() {
     log "Installing system dependencies..."
     sudo apt update -y
-    sudo apt install -y curl git unzip jq fuse3 libfuse2t64
+    sudo apt install -y curl git unzip jq fuse3
 }

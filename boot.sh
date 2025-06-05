@@ -38,7 +38,7 @@ cat << 'EOF'
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 EOF
 
-log "No need to be frustrated anymore, cursor-installer is here to help!"
+log "=> No need to be frustrated anymore, cursor-installer is here to help!"
 echo
 
 log "Beginning installation process. Press Ctrl+C to cancel at any time."
