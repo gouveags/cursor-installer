@@ -50,6 +50,9 @@ check_os_compatibility
 # Install system dependencies
 install_system_dependencies
 
+# Clone the cursor-installer repository
+clone_installer_repository
+
 # Install cursor-installer
 install_cursor_installer
 
