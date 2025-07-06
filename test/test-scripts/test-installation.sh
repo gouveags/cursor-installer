@@ -12,10 +12,6 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Test configuration
-TEST_DIR="$HOME/test-cursor-installer"
-REPO_URL="https://github.com/gouveags/cursor-installer.git"
-
 # Function to print colored output
 print_status() {
     echo -e "${GREEN}[TEST]${NC} $1"
@@ -25,72 +21,11 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-print_warning() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
-}
-
 print_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
 }
 
-# Function to run a test
-run_test() {
-    local test_name="$1"
-    local test_command="$2"
-
-    print_info "Running test: $test_name"
-
-    if eval "$test_command"; then
-        print_status "✓ Test passed: $test_name"
-        return 0
-    else
-        print_error "✗ Test failed: $test_name"
-        return 1
-    fi
-}
-
-# Test 1: Test curl-based installation
-test_curl_installation() {
-    print_info "Testing curl-based installation..."
-
-    # Test if we can fetch the installation script (fix URL)
-    if curl -fsSL "https://raw.githubusercontent.com/gouveags/cursor-installer/main/boot.sh" > /tmp/test-boot.sh; then
-        print_status "✓ Successfully fetched installation script"
-        return 0
-    else
-        print_error "✗ Failed to fetch installation script"
-        return 1
-    fi
-}
-
-# Test 2: Test local installation from workspace
-test_local_installation() {
-    print_info "Testing local installation from workspace..."
-
-    if [ -d "/workspace" ]; then
-        cd /workspace
-        if [ -f "boot.sh" ]; then
-            print_status "✓ Found boot.sh in workspace"
-
-            # Test if the script is executable
-            if [ -x "boot.sh" ]; then
-                print_status "✓ boot.sh is executable"
-                return 0
-            else
-                print_error "✗ boot.sh is not executable"
-                return 1
-            fi
-        else
-            print_error "✗ boot.sh not found in workspace"
-            return 1
-        fi
-    else
-        print_error "✗ Workspace not mounted"
-        return 1
-    fi
-}
-
-# Test 3: Test system dependencies
+# Test 1: Test system dependencies
 test_system_dependencies() {
     print_info "Testing system dependencies..."
 
@@ -112,7 +47,65 @@ test_system_dependencies() {
     fi
 }
 
-# Test 4: Test script syntax
+# Test 2: Test directory structure
+test_directory_structure() {
+    print_info "Testing directory structure..."
+
+    # Save current directory
+    local original_dir=$(pwd)
+
+    # Change to workspace directory in Docker
+    local workspace_dir="/workspace"
+    if [ ! -d "$workspace_dir" ]; then
+        print_error "Workspace directory not found: $workspace_dir"
+        return 1
+    fi
+
+    cd "$workspace_dir"
+
+    # Essential files
+    local essential_files=(
+        "boot.sh"
+        "install.sh"
+        "bin/cursor-installer"
+        "scripts/common.sh"
+        "scripts/cursor-update"
+        "scripts/uninstall.sh"
+        "README.md"
+        "LICENSE"
+    )
+
+    for file in "${essential_files[@]}"; do
+        if [ ! -f "$file" ]; then
+            print_error "Missing essential file: $file"
+            cd "$original_dir"
+            return 1
+        fi
+    done
+
+    # Essential directories
+    local essential_dirs=(
+        "bin"
+        "scripts"
+        "test"
+    )
+
+    for dir in "${essential_dirs[@]}"; do
+        if [ ! -d "$dir" ]; then
+            print_error "Missing essential directory: $dir"
+            cd "$original_dir"
+            return 1
+        fi
+    done
+
+    print_status "✓ Directory structure test passed"
+
+    # Restore original directory
+    cd "$original_dir"
+    return 0
+}
+
+# Test 3: Test script syntax
 test_script_syntax() {
     print_info "Testing script syntax..."
 
@@ -146,53 +139,44 @@ test_script_syntax() {
     return 0
 }
 
-# Test 5: Test directory structure
-test_directory_structure() {
-    echo "Testing directory structure..."
+# Test 4: Test curl-based installation
+test_curl_installation() {
+    print_info "Testing curl-based installation..."
 
-    # Change to workspace directory in Docker
-    local workspace_dir="/workspace"
-    if [ ! -d "$workspace_dir" ]; then
-        echo "ERROR: Workspace directory not found: $workspace_dir"
+    # Test if we can fetch the installation script
+    if curl -fsSL "https://raw.githubusercontent.com/gouveags/cursor-installer/main/boot.sh" > /tmp/test-boot.sh; then
+        print_status "✓ Successfully fetched installation script"
+        return 0
+    else
+        print_error "✗ Failed to fetch installation script"
         return 1
     fi
+}
 
-    cd "$workspace_dir"
+# Test 5: Test local installation from workspace
+test_local_installation() {
+    print_info "Testing local installation from workspace..."
 
-    # Essential files
-    local essential_files=(
-        "boot.sh"
-        "install.sh"
-        "bin/cursor-installer"
-        "scripts/common.sh"
-        "scripts/cursor-update"
-        "scripts/uninstall.sh"
-        "README.md"
-        "LICENSE"
-    )
+    if [ -d "/workspace" ]; then
+        if [ -f "/workspace/boot.sh" ]; then
+            print_status "✓ Found boot.sh in workspace"
 
-    for file in "${essential_files[@]}"; do
-        if [ ! -f "$file" ]; then
-            echo "ERROR: Missing essential file: $file"
+            # Test if the script is executable
+            if [ -x "/workspace/boot.sh" ]; then
+                print_status "✓ boot.sh is executable"
+                return 0
+            else
+                print_error "✗ boot.sh is not executable"
+                return 1
+            fi
+        else
+            print_error "✗ boot.sh not found in workspace"
             return 1
         fi
-    done
-
-    # Essential directories
-    local essential_dirs=(
-        "bin"
-        "scripts"
-        "test"
-    )
-
-    for dir in "${essential_dirs[@]}"; do
-        if [ ! -d "$dir" ]; then
-            echo "ERROR: Missing essential directory: $dir"
-            return 1
-        fi
-    done
-
-    echo "✓ Directory structure test passed"
+    else
+        print_error "✗ Workspace not mounted"
+        return 1
+    fi
 }
 
 # Test 6: Test if script can run in dry-run mode
@@ -220,29 +204,74 @@ main() {
     print_info "Testing environment: $(lsb_release -d | cut -f2)"
     echo
 
-    local tests=(
-        "System Dependencies:test_system_dependencies"
-        "Directory Structure:test_directory_structure"
-        "Script Syntax:test_script_syntax"
-        "Curl Installation:test_curl_installation"
-        "Local Installation:test_local_installation"
-        "Dry Run:test_dry_run"
-    )
-
     local passed=0
     local failed=0
 
-    for test in "${tests[@]}"; do
-        local test_name="${test%:*}"
-        local test_func="${test#*:}"
+    # Test 1: System Dependencies
+    echo "=== Test 1: System Dependencies ==="
+    if test_system_dependencies; then
+        ((passed++))
+        echo "✓ Test 1 completed successfully"
+    else
+        ((failed++))
+        echo "✗ Test 1 failed"
+    fi
+    echo
 
-        if run_test "$test_name" "$test_func"; then
-            ((passed++))
-        else
-            ((failed++))
-        fi
-        echo
-    done
+    # Test 2: Directory Structure
+    echo "=== Test 2: Directory Structure ==="
+    if test_directory_structure; then
+        ((passed++))
+        echo "✓ Test 2 completed successfully"
+    else
+        ((failed++))
+        echo "✗ Test 2 failed"
+    fi
+    echo
+
+    # Test 3: Script Syntax
+    echo "=== Test 3: Script Syntax ==="
+    if test_script_syntax; then
+        ((passed++))
+        echo "✓ Test 3 completed successfully"
+    else
+        ((failed++))
+        echo "✗ Test 3 failed"
+    fi
+    echo
+
+    # Test 4: Curl Installation
+    echo "=== Test 4: Curl Installation ==="
+    if test_curl_installation; then
+        ((passed++))
+        echo "✓ Test 4 completed successfully"
+    else
+        ((failed++))
+        echo "✗ Test 4 failed"
+    fi
+    echo
+
+    # Test 5: Local Installation
+    echo "=== Test 5: Local Installation ==="
+    if test_local_installation; then
+        ((passed++))
+        echo "✓ Test 5 completed successfully"
+    else
+        ((failed++))
+        echo "✗ Test 5 failed"
+    fi
+    echo
+
+    # Test 6: Dry Run
+    echo "=== Test 6: Dry Run ==="
+    if test_dry_run; then
+        ((passed++))
+        echo "✓ Test 6 completed successfully"
+    else
+        ((failed++))
+        echo "✗ Test 6 failed"
+    fi
+    echo
 
     # Summary
     print_info "Test Results:"
