@@ -25,6 +25,8 @@ RUN apt-get update && \
   systemd \
   systemd-sysv \
   libfuse2 \
+  dbus \
+  policykit-1 \
   && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user for testing

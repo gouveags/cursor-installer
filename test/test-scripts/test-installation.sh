@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# Remove strict error handling to prevent early exit on non-critical failures
+# set -euo pipefail
+
+# Add verbose debugging
+set -x
 
 if [ -z "${BASH_VERSION:-}" ]; then
   echo "[ERROR] This script must be run with bash, not sh."
@@ -8,8 +12,6 @@ fi
 
 # Test script for cursor-installer installation
 # This script tests the installation process in a Docker container
-
-set -e
 
 # Colors for output
 RED='\033[0;31m'
@@ -29,6 +31,10 @@ print_error() {
 
 print_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+print_debug() {
+    echo -e "${YELLOW}[DEBUG]${NC} $1"
 }
 
 # Test 1: Test system dependencies
@@ -59,15 +65,24 @@ test_directory_structure() {
 
     # Save current directory
     local original_dir=$(pwd)
+    print_debug "Original directory: $original_dir"
 
     # Change to workspace directory in Docker
     local workspace_dir="/workspace"
+    print_debug "Checking workspace directory: $workspace_dir"
+
     if [ ! -d "$workspace_dir" ]; then
         print_error "Workspace directory not found: $workspace_dir"
+        print_debug "Current directory contents: $(ls -la / 2>/dev/null || echo 'ls failed')"
         return 1
     fi
 
-    cd "$workspace_dir"
+    print_debug "Workspace directory exists, changing to it..."
+    cd "$workspace_dir" || {
+        print_error "Failed to change to workspace directory"
+        return 1
+    }
+    print_debug "Current directory after cd: $(pwd)"
 
     # Essential files
     local essential_files=(
@@ -82,9 +97,11 @@ test_directory_structure() {
     )
 
     for file in "${essential_files[@]}"; do
+        print_debug "Checking file: $file"
         if [ ! -f "$file" ]; then
             print_error "Missing essential file: $file"
-            cd "$original_dir"
+            print_debug "Directory contents: $(ls -la 2>/dev/null || echo 'ls failed')"
+            cd "$original_dir" 2>/dev/null || true
             return 1
         fi
     done
@@ -97,9 +114,11 @@ test_directory_structure() {
     )
 
     for dir in "${essential_dirs[@]}"; do
+        print_debug "Checking directory: $dir"
         if [ ! -d "$dir" ]; then
             print_error "Missing essential directory: $dir"
-            cd "$original_dir"
+            print_debug "Directory contents: $(ls -la 2>/dev/null || echo 'ls failed')"
+            cd "$original_dir" 2>/dev/null || true
             return 1
         fi
     done
@@ -107,7 +126,7 @@ test_directory_structure() {
     print_status "✓ Directory structure test passed"
 
     # Restore original directory
-    cd "$original_dir"
+    cd "$original_dir" 2>/dev/null || true
     return 0
 }
 
@@ -116,7 +135,7 @@ test_script_syntax() {
     print_info "Testing script syntax..."
 
     if [ -f "/workspace/boot.sh" ]; then
-        if bash -n /workspace/boot.sh; then
+        if bash -n /workspace/boot.sh 2>/dev/null; then
             print_status "✓ boot.sh syntax is valid"
         else
             print_error "✗ boot.sh syntax error"
@@ -125,7 +144,7 @@ test_script_syntax() {
     fi
 
     if [ -f "/workspace/install.sh" ]; then
-        if bash -n /workspace/install.sh; then
+        if bash -n /workspace/install.sh 2>/dev/null; then
             print_status "✓ install.sh syntax is valid"
         else
             print_error "✗ install.sh syntax error"
@@ -134,7 +153,7 @@ test_script_syntax() {
     fi
 
     if [ -f "/workspace/bin/cursor-installer" ]; then
-        if bash -n /workspace/bin/cursor-installer; then
+        if bash -n /workspace/bin/cursor-installer 2>/dev/null; then
             print_status "✓ cursor-installer syntax is valid"
         else
             print_error "✗ cursor-installer syntax error"
@@ -150,7 +169,7 @@ test_curl_installation() {
     print_info "Testing curl-based installation..."
 
     # Test if we can fetch the installation script
-    if curl -fsSL "https://raw.githubusercontent.com/gouveags/cursor-installer/main/boot.sh" > /tmp/test-boot.sh; then
+    if curl -fsSL "https://raw.githubusercontent.com/gouveags/cursor-installer/main/boot.sh" > /tmp/test-boot.sh 2>/dev/null; then
         print_status "✓ Successfully fetched installation script"
         return 0
     else
@@ -207,7 +226,17 @@ test_dry_run() {
 # Main test runner
 main() {
     print_info "Starting cursor-installer test suite..."
-    print_info "Testing environment: $(lsb_release -d | cut -f2)"
+
+    # Try to get system info, but don't fail if it doesn't work
+    if command -v lsb_release >/dev/null 2>&1; then
+        print_info "Testing environment: $(lsb_release -d | cut -f2 2>/dev/null || echo 'Unknown')"
+    else
+        print_info "Testing environment: Unknown (lsb_release not available)"
+    fi
+
+    print_debug "Current working directory: $(pwd)"
+    print_debug "User: $(whoami)"
+    print_debug "Home directory: $HOME"
     echo
 
     local passed=0

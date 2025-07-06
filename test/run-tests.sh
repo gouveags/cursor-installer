@@ -39,6 +39,7 @@ Usage: $0 [OPTIONS] [COMMAND]
 Commands:
   build                    Build all test containers
   test [ENVIRONMENT]       Run tests (default: all environments)
+  quick-test [ENVIRONMENT] Run quick diagnostic test
   shell [ENVIRONMENT]      Open shell in test environment
   clean                    Clean up test containers and volumes
   logs [ENVIRONMENT]       Show logs from test environment
@@ -58,6 +59,7 @@ Options:
 Examples:
   $0 build                # Build all test containers
   $0 test ubuntu-22       # Test on Ubuntu 22.04
+  $0 quick-test ubuntu-22 # Run quick diagnostic test
   $0 shell debian-12      # Open shell in Debian 12 container
   $0 clean                # Clean up everything
 
@@ -113,9 +115,22 @@ run_test_environment() {
     print_header "Running tests in $env environment..."
 
     if command -v docker-compose >/dev/null 2>&1; then
-        docker-compose run --rm "$env" ./test-scripts/test-installation.sh
+        docker-compose run --rm "$env" /home/testuser/test-scripts/test-installation.sh
     else
-        docker compose run --rm "$env" ./test-scripts/test-installation.sh
+        docker compose run --rm "$env" /home/testuser/test-scripts/test-installation.sh
+    fi
+}
+
+# Run quick test in specific environment
+run_quick_test_environment() {
+    local env="$1"
+
+    print_header "Running quick test in $env environment..."
+
+    if command -v docker-compose >/dev/null 2>&1; then
+        docker-compose run --rm "$env" /home/testuser/test-scripts/quick-test.sh
+    else
+        docker compose run --rm "$env" /home/testuser/test-scripts/quick-test.sh
     fi
 }
 
@@ -223,7 +238,7 @@ main() {
                 PULL_IMAGES="true"
                 shift
                 ;;
-            build|test|shell|clean|logs)
+            build|test|quick-test|shell|clean|logs)
                 command="$1"
                 shift
                 ;;
@@ -260,6 +275,13 @@ main() {
             else
                 run_test_environment "$environment"
             fi
+            ;;
+        quick-test)
+            if [[ "$environment" == "all" ]]; then
+                print_error "Please specify a specific environment for quick test"
+                exit 1
+            fi
+            run_quick_test_environment "$environment"
             ;;
         shell)
             if [[ "$environment" == "all" ]]; then
