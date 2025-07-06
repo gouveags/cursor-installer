@@ -1,0 +1,63 @@
+version: "3.8"
+
+services:
+  # Ubuntu 22.04 LTS test environment
+  ubuntu-22:
+    build: .
+    container_name: cursor-installer-test-ubuntu22
+    tty: true
+    stdin_open: true
+    volumes:
+      - ../:/workspace:ro # Mount the project directory as read-only
+      - test-home:/home/testuser # Persistent home directory
+    environment:
+      - TERM=xterm-256color
+      - BRANCH_REF=main
+    networks:
+      - cursor-test-network
+    command: /bin/bash
+
+  # Ubuntu 20.04 LTS test environment (for compatibility testing)
+  ubuntu-20:
+    build:
+      context: .
+      dockerfile: Dockerfile.ubuntu20
+    container_name: cursor-installer-test-ubuntu20
+    tty: true
+    stdin_open: true
+    volumes:
+      - ../:/workspace:ro
+      - test-home-20:/home/testuser
+    environment:
+      - TERM=xterm-256color
+      - BRANCH_REF=main
+    networks:
+      - cursor-test-network
+    command: /bin/bash
+
+  # Debian 12 test environment
+  debian-12:
+    build:
+      context: .
+      dockerfile: Dockerfile.debian12
+    container_name: cursor-installer-test-debian12
+    tty: true
+    stdin_open: true
+    volumes:
+      - ../:/workspace:ro
+      - test-home-debian:/home/testuser
+    environment:
+      - TERM=xterm-256color
+      - BRANCH_REF=main
+    networks:
+      - cursor-test-network
+    command: /bin/bash
+
+volumes:
+  test-home:
+  test-home-20:
+  test-home-debian:
+
+networks:
+  cursor-test-network:
+    driver: bridge

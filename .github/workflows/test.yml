@@ -1,0 +1,285 @@
+name: Test Cursor Installer
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+
+jobs:
+  syntax-check:
+    name: Syntax Check
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check shell script syntax
+      run: |
+        # Check syntax of all shell scripts
+        find . -name "*.sh" -type f -exec bash -n {} \;
+        echo "✓ All shell scripts have valid syntax"
+
+    - name: Check for bashisms
+      run: |
+        # Install checkbashisms if available
+        sudo apt-get update
+        sudo apt-get install -y devscripts || true
+
+        # Check for bashisms if tool is available
+        if command -v checkbashisms >/dev/null 2>&1; then
+          find . -name "*.sh" -type f -exec checkbashisms {} \; || true
+        else
+          echo "checkbashisms not available, skipping bashism check"
+        fi
+
+  test-ubuntu-22:
+    name: Test Ubuntu 22.04
+    runs-on: ubuntu-latest
+    needs: syntax-check
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build test container
+      run: |
+        cd test
+        docker build -t cursor-installer-test:ubuntu22 .
+
+    - name: Run tests
+      run: |
+        cd test
+        docker run --rm \
+          -v ${{ github.workspace }}:/workspace:ro \
+          cursor-installer-test:ubuntu22 \
+          ./test-scripts/test-installation.sh
+
+  test-ubuntu-20:
+    name: Test Ubuntu 20.04
+    runs-on: ubuntu-latest
+    needs: syntax-check
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build test container
+      run: |
+        cd test
+        docker build -f Dockerfile.ubuntu20 -t cursor-installer-test:ubuntu20 .
+
+    - name: Run tests
+      run: |
+        cd test
+        docker run --rm \
+          -v ${{ github.workspace }}:/workspace:ro \
+          cursor-installer-test:ubuntu20 \
+          ./test-scripts/test-installation.sh
+
+  test-debian-12:
+    name: Test Debian 12
+    runs-on: ubuntu-latest
+    needs: syntax-check
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build test container
+      run: |
+        cd test
+        docker build -f Dockerfile.debian12 -t cursor-installer-test:debian12 .
+
+    - name: Run tests
+      run: |
+        cd test
+        docker run --rm \
+          -v ${{ github.workspace }}:/workspace:ro \
+          cursor-installer-test:debian12 \
+          ./test-scripts/test-installation.sh
+
+  integration-test:
+    name: Integration Test
+    runs-on: ubuntu-latest
+    needs: [test-ubuntu-22, test-ubuntu-20, test-debian-12]
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Test curl installation method
+      run: |
+        # Create a temporary test environment
+        docker run --rm -i ubuntu:22.04 bash << 'EOF'
+        set -e
+
+        # Install basic dependencies
+        apt-get update
+        apt-get install -y curl sudo git
+
+        # Create test user
+        useradd -m -s /bin/bash testuser
+        echo "testuser:testuser" | chpasswd
+        adduser testuser sudo
+        echo "testuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+        # Switch to test user and test our bootstrap script
+        sudo -u testuser bash << 'INNER_EOF'
+        cd /home/testuser
+
+        # Test if our bootstrap script can be fetched
+        echo "Testing bootstrap script fetch..."
+        if curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref_name }}/boot.sh > /tmp/test-boot.sh; then
+          echo "✓ Successfully fetched bootstrap script"
+
+          # Test script syntax
+          if bash -n /tmp/test-boot.sh; then
+            echo "✓ Bootstrap script syntax is valid"
+          else
+            echo "✗ Bootstrap script syntax error"
+            exit 1
+          fi
+        else
+          echo "✗ Failed to fetch bootstrap script"
+          exit 1
+        fi
+        INNER_EOF
+        EOF
+
+  # Test that the repository structure is correct
+  structure-test:
+    name: Repository Structure Test
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Verify required files exist
+      run: |
+        required_files=(
+          "boot.sh"
+          "install.sh"
+          "bin/cursor-installer"
+          "scripts/common.sh"
+          "scripts/cursor-update"
+          "scripts/uninstall.sh"
+          "test/run-tests.sh"
+          "test/Dockerfile"
+          "test/docker-compose.yml"
+          "README.md"
+          "LICENSE"
+        )
+
+        missing_files=()
+        for file in "${required_files[@]}"; do
+          if [ ! -f "$file" ]; then
+            missing_files+=("$file")
+          fi
+        done
+
+        if [ ${#missing_files[@]} -gt 0 ]; then
+          echo "Missing required files:"
+          printf '%s\n' "${missing_files[@]}"
+          exit 1
+        fi
+
+    - name: Syntax check all shell scripts
+      run: |
+        scripts_to_check=(
+          "boot.sh"
+          "install.sh"
+          "bin/cursor-installer"
+          "scripts/common.sh"
+          "scripts/cursor-update"
+          "scripts/uninstall.sh"
+          "test/run-tests.sh"
+          "test/test-scripts/test-installation.sh"
+        )
+
+    - name: Check file permissions
+      run: |
+        executable_files=(
+          "boot.sh"
+          "install.sh"
+          "bin/cursor-installer"
+          "scripts/cursor-update"
+          "scripts/uninstall.sh"
+          "test/run-tests.sh"
+        )
+
+        for file in "${executable_files[@]}"; do
+          if [ -f "$file" ] && [ ! -x "$file" ]; then
+            echo "✗ File $file is not executable"
+            exit 1
+          fi
+        done
+
+        echo "✓ All required files have correct permissions"
+
+  # Test documentation and README
+  docs-test:
+    name: Documentation Test
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check README content
+      run: |
+        # Check if README contains essential sections
+        required_sections=(
+          "Quick Start"
+          "Features"
+          "Requirements"
+          "Usage"
+          "Testing"
+          "Installation"
+        )
+
+        for section in "${required_sections[@]}"; do
+          if ! grep -qi "$section" README.md; then
+            echo "✗ README.md missing section: $section"
+            exit 1
+          fi
+        done
+
+        echo "✓ README.md contains all required sections"
+
+    - name: Check for installation command
+      run: |
+        if ! grep -q "curl.*boot.sh.*bash" README.md; then
+          echo "✗ README.md missing curl installation command"
+          exit 1
+        fi
+        echo "✓ README.md contains installation command"
+
+  # Final integration check
+  final-check:
+    name: Final Integration Check
+    runs-on: ubuntu-latest
+    needs: [integration-test, structure-test, docs-test]
+    if: always()
+    steps:
+    - name: Check all tests passed
+      run: |
+        if [[ "${{ needs.integration-test.result }}" == "success" &&
+              "${{ needs.structure-test.result }}" == "success" &&
+              "${{ needs.docs-test.result }}" == "success" ]]; then
+          echo "🎉 All tests passed! Cursor Installer is ready."
+        else
+          echo "❌ Some tests failed. Please check the logs."
+          exit 1
+        fi

@@ -17,6 +17,130 @@ get_installed_version_display() {
     fi
 }
 
+# Function to show help
+show_help() {
+    cat << 'EOF'
+
+    @@@@@@@@   ____                          @@@@@@@@@
+    @@@@@@@@  / ___|   _ _ __ ___  ___  _ __   @@@@@@@@@
+    @@@@@@@@ | |  | | | | '__/ __|/ _ \| '__|  @@@@@@@@@
+    @@@@@@@@ | |__| |_| | |  \__ \ (_) | |     @@@@@@@@@
+    @@@@@@@@  \____\__,_|_|  |___/\___/|_|     @@@@@@@@@
+    @@@@@@@@                                   @@@@@@@@@
+
+    CURSOR INSTALLER - AI-Powered Code Editor for Linux
+
+    USAGE:
+        cursor-installer [COMMAND]
+
+    COMMANDS:
+        install                 Install or update Cursor IDE
+        uninstall               Uninstall Cursor IDE
+        remove-updater          Remove the automatic updater service
+        update                  Check for and install updates
+        check                   Check for available updates without installing
+        version                 Show currently installed version
+        latest                  Show latest available version
+        status                  Show installation status and versions
+        help                    Show this help message
+
+    WITHOUT ARGUMENTS:
+        cursor-installer        Interactive menu mode
+
+    EXAMPLES:
+        cursor-installer install           # Install or update Cursor
+        cursor-installer check             # Check for updates
+        cursor-installer version           # Show current version
+        cursor-installer status            # Show detailed status
+        cursor-installer uninstall         # Uninstall Cursor
+        cursor-installer remove-updater    # Remove auto-updater
+
+    MORE INFORMATION:
+        - Documentation: https://github.com/gouveags/cursor-installer
+        - Issues: https://github.com/gouveags/cursor-installer/issues
+        - License: MIT
+
+EOF
+}
+
+# Function to show version
+show_version() {
+    local current_version
+    current_version=$(get_installed_version_display)
+
+    if [ "$current_version" = "none" ]; then
+        echo "Cursor IDE is not installed"
+        exit 1
+    else
+        echo "$current_version"
+    fi
+}
+
+# Function to show latest version
+show_latest() {
+    local latest_version
+    latest_version=$(get_latest_version)
+
+    if [ -z "$latest_version" ]; then
+        echo "Failed to fetch latest version"
+        exit 1
+    else
+        echo "$latest_version"
+    fi
+}
+
+# Function to show status
+show_status() {
+    local current_version
+    local latest_version
+    local updater_status
+
+    current_version=$(get_installed_version_display)
+    latest_version=$(get_latest_version)
+
+    if [ -f "$HOME/.config/systemd/user/cursor-update.service" ]; then
+        updater_status="Enabled"
+    else
+        updater_status="Disabled"
+    fi
+
+    echo "Cursor IDE Status:"
+    echo "=================="
+    echo "Installed Version: $current_version"
+    echo "Latest Version:    $latest_version"
+    echo "Auto-updater:      $updater_status"
+    echo
+
+    if [ "$current_version" = "none" ]; then
+        echo "Status: Not installed"
+    elif [ "$current_version" = "$latest_version" ]; then
+        echo "Status: Up to date"
+    else
+        echo "Status: Update available"
+    fi
+}
+
+# Function to check for updates
+check_updates() {
+    if ! check_installation; then
+        echo "Cursor is not installed"
+        exit 1
+    fi
+
+    local current_version
+    local latest_version
+
+    current_version=$(get_installed_version)
+    latest_version=$(get_latest_version)
+
+    if [ "$current_version" = "$latest_version" ]; then
+        echo "Cursor is up to date (version $current_version)"
+    else
+        echo "Update available: $current_version -> $latest_version"
+        exit 1
+    fi
+}
+
 # Function to display menu
 show_menu() {
     clear
@@ -29,7 +153,9 @@ show_menu() {
     echo "2) Uninstall Cursor"
     echo "3) Remove Updater"
     echo "4) Check for Updates"
-    echo "5) Quit"
+    echo "5) Show Status"
+    echo "6) Help"
+    echo "7) Quit"
     echo
 }
 
@@ -112,10 +238,12 @@ handle_uninstall() {
         return
     fi
 
-    read -rp "Are you sure you want to uninstall Cursor? (y/N) " ans
-    if [[ "${ans,,}" != "y" ]]; then
-        log "Uninstallation cancelled"
-        return
+    if [ -z "$1" ]; then
+        read -rp "Are you sure you want to uninstall Cursor? (y/N) " ans
+        if [[ "${ans,,}" != "y" ]]; then
+            log "Uninstallation cancelled"
+            return
+        fi
     fi
 
     log "Starting Cursor uninstallation..."
@@ -155,10 +283,12 @@ handle_updater_remove() {
         return
     fi
 
-    read -rp "Are you sure you want to remove the Cursor updater? (y/N) " ans
-    if [[ "${ans,,}" != "y" ]]; then
-        log "Updater removal cancelled"
-        return
+    if [ -z "$1" ]; then
+        read -rp "Are you sure you want to remove the Cursor updater? (y/N) " ans
+        if [[ "${ans,,}" != "y" ]]; then
+            log "Updater removal cancelled"
+            return
+        fi
     fi
 
     log "Removing update service..."
@@ -180,10 +310,10 @@ handle_update_check() {
 }
 
 # Main menu loop
-main() {
+interactive_menu() {
     while true; do
         show_menu
-        read -rp "Choose an option (1-5): " choice
+        read -rp "Choose an option (1-7): " choice
         echo
 
         case $choice in
@@ -191,7 +321,9 @@ main() {
             2) handle_uninstall ;;
             3) handle_updater_remove ;;
             4) handle_update_check ;;
-            5) log "Goodbye!"; exit 0 ;;
+            5) show_status ;;
+            6) show_help ;;
+            7) log "Goodbye!"; exit 0 ;;
             *) warn "Invalid option. Please try again." ;;
         esac
 
@@ -200,7 +332,48 @@ main() {
     done
 }
 
-# Run main menu
-main
+# Main function
+main() {
+    case "$1" in
+        install)
+            handle_install
+            ;;
+        uninstall)
+            handle_uninstall "noninteractive"
+            ;;
+        remove-updater)
+            handle_updater_remove "noninteractive"
+            ;;
+        update)
+            handle_update_check
+            ;;
+        check)
+            check_updates
+            ;;
+        version)
+            show_version
+            ;;
+        latest)
+            show_latest
+            ;;
+        status)
+            show_status
+            ;;
+        help|-h|--help)
+            show_help
+            ;;
+        "")
+            interactive_menu
+            ;;
+        *)
+            echo "Unknown command: $1"
+            echo "Use 'cursor-installer help' for usage information"
+            exit 1
+            ;;
+    esac
+}
+
+# Run main function with all arguments
+main "$@"
 
 
