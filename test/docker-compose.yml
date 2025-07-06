@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   # Ubuntu 22.04 LTS test environment
   ubuntu-22:
