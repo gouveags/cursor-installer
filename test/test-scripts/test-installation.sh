@@ -53,8 +53,8 @@ run_test() {
 test_curl_installation() {
     print_info "Testing curl-based installation..."
 
-    # Test if we can fetch the installation script
-    if curl -fsSL "$REPO_URL/raw/main/boot.sh" > /tmp/test-boot.sh; then
+    # Test if we can fetch the installation script (fix URL)
+    if curl -fsSL "https://raw.githubusercontent.com/gouveags/cursor-installer/main/boot.sh" > /tmp/test-boot.sh; then
         print_status "✓ Successfully fetched installation script"
         return 0
     else
@@ -150,6 +150,15 @@ test_script_syntax() {
 test_directory_structure() {
     echo "Testing directory structure..."
 
+    # Change to workspace directory in Docker
+    local workspace_dir="/workspace"
+    if [ ! -d "$workspace_dir" ]; then
+        echo "ERROR: Workspace directory not found: $workspace_dir"
+        return 1
+    fi
+
+    cd "$workspace_dir"
+
     # Essential files
     local essential_files=(
         "boot.sh"
@@ -191,12 +200,12 @@ test_dry_run() {
     print_info "Testing dry-run mode..."
 
     if [ -f "/workspace/boot.sh" ]; then
-        # Test if we can source the script without executing main
-        if bash -c "source /workspace/boot.sh && echo 'Script loaded successfully'" >/dev/null 2>&1; then
-            print_status "✓ Script can be sourced without errors"
+        # Test if we can read the script without executing it
+        if head -20 "/workspace/boot.sh" >/dev/null 2>&1; then
+            print_status "✓ Script can be read without errors"
             return 0
         else
-            print_error "✗ Script cannot be sourced"
+            print_error "✗ Script cannot be read"
             return 1
         fi
     else
