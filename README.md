@@ -9,6 +9,54 @@
 
 Transform your Linux system into a Cursor-powered development environment with this comprehensive installer. This tool provides automatic installation, updates, and management of the Cursor IDE - an AI-powered code editor that will revolutionize your coding experience.
 
+## 📋 Table of Contents
+
+- [Cursor Installer 🖱️](#cursor-installer-️)
+  - [📋 Table of Contents](#-table-of-contents)
+  - [✨ Features](#-features)
+  - [🚀 Quick Start](#-quick-start)
+    - [One-Line Installation](#one-line-installation)
+    - [Manual Installation](#manual-installation)
+    - [Branch-Specific Installation](#branch-specific-installation)
+  - [📋 System Requirements](#-system-requirements)
+  - [🎮 Usage](#-usage)
+    - [Interactive Menu](#interactive-menu)
+    - [Command Line Interface](#command-line-interface)
+      - [Available Commands](#available-commands)
+      - [Command Examples](#command-examples)
+  - [🗂️ Project Structure](#️-project-structure)
+  - [🔧 Installation Details](#-installation-details)
+    - [What Gets Installed](#what-gets-installed)
+    - [Installation Locations](#installation-locations)
+  - [🔄 Update System](#-update-system)
+    - [Automatic Updates](#automatic-updates)
+    - [Manual Updates](#manual-updates)
+  - [🗑️ Uninstallation](#️-uninstallation)
+    - [Uninstall Cursor IDE](#uninstall-cursor-ide)
+    - [Remove Auto-updater](#remove-auto-updater)
+    - [Complete Removal](#complete-removal)
+    - [Manual Cleanup](#manual-cleanup)
+  - [🧪 Development \& Testing](#-development--testing)
+    - [Advanced Test Runner](#advanced-test-runner)
+      - [Test Commands](#test-commands)
+      - [Test Environments](#test-environments)
+      - [Test Options](#test-options)
+      - [Test Examples](#test-examples)
+    - [Docker Testing](#docker-testing)
+    - [Test Infrastructure](#test-infrastructure)
+    - [Continuous Integration](#continuous-integration)
+    - [Development Workflow](#development-workflow)
+    - [Contributing Guidelines](#contributing-guidelines)
+  - [🔍 Troubleshooting](#-troubleshooting)
+    - [Common Issues](#common-issues)
+    - [Debug Information](#debug-information)
+    - [Log Files](#log-files)
+  - [📚 FAQ](#-faq)
+  - [🤝 Contributing](#-contributing)
+  - [📜 License](#-license)
+  - [🙏 Acknowledgments](#-acknowledgments)
+  - [🔗 Links](#-links)
+
 ## ✨ Features
 
 - **🚀 One-line Installation**: Install with a single curl command
@@ -39,10 +87,22 @@ cd cursor-installer
 
 ### Branch-Specific Installation
 
+Install from a specific branch (useful for testing development versions):
+
 ```bash
+# Install from develop branch
 export BRANCH_REF=develop
 curl -fsSL https://raw.githubusercontent.com/gouveags/cursor-installer/main/boot.sh | bash
+
+# Install from a specific feature branch
+export BRANCH_REF=feature/my-feature
+curl -fsSL https://raw.githubusercontent.com/gouveags/cursor-installer/main/boot.sh | bash
 ```
+
+**Note**: The `BRANCH_REF` environment variable allows you to install cursor-installer from any branch in the repository. This is particularly useful for:
+- Testing development versions
+- Contributing to the project
+- Trying experimental features
 
 ## 📋 System Requirements
 
@@ -240,39 +300,171 @@ rm -rf ~/.local/share/cursor-installer
 
 ## 🧪 Development & Testing
 
-### Local Testing
+### Advanced Test Runner
 
-Run the comprehensive test suite:
+The project includes a sophisticated test runner with comprehensive functionality:
 
 ```bash
 cd test
-./run-tests.sh build    # Build test environments
-./run-tests.sh test     # Run all tests
-./run-tests.sh clean    # Clean up test environments
+./run-tests.sh [OPTIONS] [COMMAND] [ENVIRONMENT]
+```
+
+#### Test Commands
+
+| Command | Description |
+|---------|-------------|
+| `build` | Build all test containers |
+| `test [ENV]` | Run full test suite (default: all environments) |
+| `quick-test [ENV]` | Run quick diagnostic tests |
+| `shell [ENV]` | Open interactive shell in test environment |
+| `clean` | Clean up test containers and volumes |
+| `logs [ENV]` | Show logs from test environment |
+
+#### Test Environments
+
+| Environment | Description |
+|-------------|-------------|
+| `ubuntu-22` | Ubuntu 22.04 LTS |
+| `ubuntu-20` | Ubuntu 20.04 LTS |
+| `debian-12` | Debian 12 |
+| `all` | All environments (default) |
+
+#### Test Options
+
+| Option | Description |
+|--------|-------------|
+| `-h, --help` | Show help message |
+| `-v, --verbose` | Verbose output |
+| `--no-cache` | Build without cache |
+| `--pull` | Pull latest base images |
+
+#### Test Examples
+
+```bash
+# Build all test containers
+./run-tests.sh build
+
+# Run all tests across all environments
+./run-tests.sh test
+
+# Run tests on specific environment
+./run-tests.sh test ubuntu-22
+
+# Run quick diagnostic tests
+./run-tests.sh quick-test ubuntu-22
+
+# Open interactive shell for debugging
+./run-tests.sh shell debian-12
+
+# View logs from test environment
+./run-tests.sh logs ubuntu-20
+
+# Clean up everything
+./run-tests.sh clean
+
+# Build with options
+./run-tests.sh --no-cache --pull build
 ```
 
 ### Docker Testing
 
-Test on different distributions:
+Direct Docker testing (alternative to test runner):
 
 ```bash
 # Test on Ubuntu 22.04
-docker-compose -f test/docker-compose.yml run ubuntu22
+docker-compose -f test/docker-compose.yml run ubuntu-22
 
 # Test on Ubuntu 20.04
-docker-compose -f test/docker-compose.yml run ubuntu20
+docker-compose -f test/docker-compose.yml run ubuntu-20
 
 # Test on Debian 12
-docker-compose -f test/docker-compose.yml run debian12
+docker-compose -f test/docker-compose.yml run debian-12
 ```
 
-### Contributing
+### Test Infrastructure
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+The testing infrastructure includes:
+
+- **Multi-distribution Support**: Ubuntu 22.04, Ubuntu 20.04, Debian 12
+- **Containerized Testing**: Isolated test environments with Docker
+- **Comprehensive Test Suite**: 6 different test scenarios:
+  1. System Dependencies Check
+  2. Directory Structure Validation
+  3. Script Syntax Verification
+  4. Curl-based Installation Test
+  5. Local Installation Test
+  6. Dry-run Mode Test
+- **Quick Diagnostic Tests**: Fast environment validation
+- **Interactive Debugging**: Shell access for troubleshooting
+- **Automated CI/CD**: GitHub Actions with daily scheduled tests
+- **Syntax Validation**: Automatic shell script syntax checking
+- **Integration Testing**: Full installation workflow validation
+
+### Continuous Integration
+
+The project uses GitHub Actions for automated testing:
+
+- **Syntax Check**: Validates all shell scripts
+- **Multi-Distribution Testing**: Tests on Ubuntu 22.04, 20.04, and Debian 12
+- **Integration Testing**: Tests curl-based installation method
+- **Structure Validation**: Ensures all required files are present
+- **Documentation Testing**: Validates README completeness
+- **Daily Scheduled Tests**: Runs tests daily at 2 AM UTC
+- **Pull Request Testing**: Automatic testing on all PRs
+
+### Development Workflow
+
+For contributors working on the project:
+
+1. **Fork and Clone**:
+   ```bash
+   git clone https://github.com/yourusername/cursor-installer.git
+   cd cursor-installer
+   ```
+
+2. **Create Feature Branch**:
+   ```bash
+   git checkout -b feature/my-feature
+   ```
+
+3. **Test Your Changes**:
+   ```bash
+   # Build test environments
+   cd test
+   ./run-tests.sh build
+
+   # Run quick tests for rapid feedback
+   ./run-tests.sh quick-test ubuntu-22
+
+   # Run full test suite
+   ./run-tests.sh test
+
+   # Test specific environment
+   ./run-tests.sh test debian-12
+
+   # Debug interactively if needed
+   ./run-tests.sh shell ubuntu-22
+   ```
+
+4. **Test Branch-Specific Installation**:
+   ```bash
+   # Test your branch before submitting PR
+   export BRANCH_REF=feature/my-feature
+   curl -fsSL https://raw.githubusercontent.com/gouveags/cursor-installer/main/boot.sh | bash
+   ```
+
+5. **Submit Pull Request**:
+   - Ensure all tests pass
+   - Include description of changes
+   - Update documentation if needed
+
+### Contributing Guidelines
+
+- **Code Style**: Follow existing bash script conventions
+- **Testing**: All changes must pass the test suite
+- **Documentation**: Update README for new features
+- **Compatibility**: Ensure compatibility with all supported distributions
+- **Security**: Be mindful of security implications in installation scripts
 
 ## 🔍 Troubleshooting
 
