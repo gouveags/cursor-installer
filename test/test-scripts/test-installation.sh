@@ -1,4 +1,10 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ -z "${BASH_VERSION:-}" ]; then
+  echo "[ERROR] This script must be run with bash, not sh."
+  exit 1
+fi
 
 # Test script for cursor-installer installation
 # This script tests the installation process in a Docker container
